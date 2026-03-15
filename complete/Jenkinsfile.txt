@@ -1,16 +1,33 @@
 pipeline {
     agent any
 
+    options {
+        skipStagesAfterUnstable()
+    }
+
+    tools {
+        maven '3.9.11'
+    }
+
     stages {
-        stage('Checkout') {
+
+        stage('Checkout Source Code') {
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/Rif2code/springboot-jenkins-demo.git'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'git --version'
+                sh 'mvn --version'
+                sh 'mvn clean test'
             }
         }
 
         stage('Build Fat Jar') {
             steps {
-                bat 'mvnw.cmd clean package -DskipTests'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
