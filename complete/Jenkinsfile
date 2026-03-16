@@ -10,7 +10,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout Source Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/Rif2code/springboot-jenkins-demo.git'
@@ -19,21 +18,27 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'git --version'
-                sh 'mvn --version'
-                sh 'mvn clean test'
+                dir('complete') {
+                    sh 'git --version'
+                    sh 'mvn --version'
+                    sh 'chmod +x mvnw'
+                    sh './mvnw clean test'
+                }
             }
         }
 
         stage('Build Fat Jar') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                dir('complete') {
+                    sh 'chmod +x mvnw'
+                    sh './mvnw clean package -DskipTests'
+                }
             }
         }
 
         stage('Archive Artifact') {
             steps {
-                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                archiveArtifacts artifacts: 'complete/target/*.jar', fingerprint: true
             }
         }
     }
