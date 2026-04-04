@@ -1,8 +1,14 @@
 pipeline {
     agent any
 
+    environment {
+        NEXUS_URL = 'http://host.docker.internal:8081'
+        NEXUS_REPO = 'maven-releases'
+    }
+
     stages {
-        stage('Build') {
+
+        stage('Build JAR') {
             steps {
                 dir('complete') {
                     sh '''
@@ -19,14 +25,45 @@ pipeline {
                 archiveArtifacts artifacts: 'complete/target/*.jar', fingerprint: true
             }
         }
+
+        stage('Upload to Nexus') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh '''
+                        JAR_FILE=$(ls complete/target/*.jar | head -n 1)
+
+                        GROUP_ID=$(cd complete && ./mvnw -q -DforceStdout help:evaluate -Dexpression=project.groupId)
+                        ARTIFACT_ID=$(cd complete && ./mvnw -q -DforceStdout help:evaluate -Dexpression=project.artifactId)
+                        VERSION=$(cd complete && ./mvnw -q -DforceStdout help:evaluate -Dexpression=project.version)
+
+                        echo "Uploading $JAR_FILE"
+                        echo "Coordinates: $GROUP_ID:$ARTIFACT_ID:$VERSION"
+
+                        curl -u "$NEXUS_USER:$NEXUS_PASS" \
+                             -X POST "$NEXUS_URL/service/rest/v1/components?repository=$NEXUS_REPO" \
+                             -F maven2.groupId="$GROUP_ID" \
+                             -F maven2.artifactId="$ARTIFACT_ID" \
+                             -F maven2.version="$VERSION" \
+                             -F maven2.generate-pom=true \
+                             -F maven2.asset1=@"$JAR_FILE" \
+                             -F maven2.asset1.extension=jar
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo 'Spring Boot jar built successfully.'
+            echo 'JAR successfully uploaded to Nexus!'
         }
         failure {
-            echo 'Build failed.'
+            echo 'Upload failed.'
         }
     }
 }
